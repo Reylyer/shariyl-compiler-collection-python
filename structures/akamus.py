@@ -40,7 +40,7 @@ class Kamus(Tokenizer):
     }
 
     def __init__(self, r_str: str, a_line: int, a_charidx: int) -> None:
-        super().__init__(r_str, self._reserved_keyword, self._reserved_operator, self._braces, a_line, a_charidx)
+        super().__init__(r_str, self._reserved_keyword, self._reserved_operator, [], self._braces, a_line, a_charidx)
         self.a_line = a_line
         self.a_charidx = a_charidx
         self.register = {}
@@ -49,7 +49,7 @@ class Kamus(Tokenizer):
     def __create_register(self):
         # ASUUUU REGISTER ADT GIMANA CARANYA ANJIINGGGG
         # TODO: creating register (Kamus)
-        ktokens = [t for t in self.ktokens if t.ttype != "COMMENT"][::-1]
+        ktokens = list(reversed([t for t in self.tokens if t.ttype != "COMMENT"]))
         tok = ktokens.pop()
 
         # clean left over kamus / lokal
@@ -58,6 +58,8 @@ class Kamus(Tokenizer):
             if tok.value == "LOKAL":
                 tok = ktokens.pop()
             ktokens.append(tok)
+        ktokens.pop()
+        
 
         while len(ktokens):
             try:
@@ -109,14 +111,12 @@ class Kamus(Tokenizer):
                         raise TypeError(f"`{rside.value}` bukan sebuah tipe data!")
                 else:
                     raise TypeError(f"`{rside.value}` tidak terdaftar")
+                
+                enter = ktokens.pop()
+                if enter.ttype != "NEWLINE":
+                    raise SyntaxError
                     
             except IndexError as e:
                 raise SyntaxError(f"Something Something ga lengkap") from None
                 
-    def show_tokens(self) -> None:
-        for idx, tok in enumerate(self.ktokens):
-            print(f"{idx: <4}{tok.ttype: <12} {tok.line}:{tok.charidx} {tok.value}")
-
-    def show_register(self) -> None:
-        for idx, (identifier, reg) in enumerate(self.register.items()):
-            print(f"{idx: <4}{identifier:<10}: {reg.type} = {reg.value}")
+    

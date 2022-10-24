@@ -1,9 +1,10 @@
+from mimetypes import init
 import re
 
 class PushBackStream:
     def __init__(self, source, raw = False) -> None:
         self.data = source if raw else open(source, 'r').read()
-        self.data = self.data[::-1]
+        self.data = list(reversed(self.data))
         self.pos = 0
         self.line = 0
 
@@ -16,11 +17,11 @@ class PushBackStream:
     def pop(self) -> str: # type:ignore
         if len(self.data) == 0:
             return ""
-        self.data, r = self.data[:-1], self.data[-1]
+        self.data, retval = self.data[:-1], self.data[-1]
         self.pos += 1
-        if r == '\n':
+        if retval == '\n':
             self.line += 1
-        return r
+        return retval
 
 
 class Identifier:
@@ -42,18 +43,20 @@ class Tokenizer:
                  r_str: str, 
                  reserved_keyword: list, 
                  reserved_operator: list, 
+                 keyword_operator: list,
                  special: list, 
                  a_line: int, 
                  a_charidx: int) -> None:
         self.r_str = r_str
         self._reserved_keyword = reserved_keyword
         self._reserved_operator = reserved_operator
+        self._keyword_operator = keyword_operator
         self._special = special
         self.a_line = a_line
         self.a_charidx = a_charidx
         self.line = 0
         self.charidx = 0
-        self.ktokens = []
+        self.tokens = []
 
         self.stream = PushBackStream(self.r_str, raw=True)
         self.__tokenize()
@@ -62,35 +65,41 @@ class Tokenizer:
         ch = self.stream.pop()
         word = ""
 
-        while ch.isalpha():
+        while ch.isalnum() or ch == ".":
             word += ch
             ch = self.stream.pop()
         self.stream.push(ch)
-
         if word:
             if word in self._reserved_keyword:
-                self.ktokens.append(Token("KEYWORD", word, self.stream.line, self.stream.pos - len(word)))
+                type = "OPERATOR" if word in self._keyword_operator else "KEYWORD"
+                self.tokens.append(Token(type, word, self.stream.line, self.stream.pos - len(word)))
             elif word[0].isdigit():
                 try:
-                    self.ktokens.append(int(word))
-                    self.ktokens.append(Token("INTEGER", word, self.stream.line, self.stream.pos - len(word)))
+                    num = int(word)
+                    self.tokens.append(Token("INTEGER", num, self.stream.line, self.stream.pos - len(word)))
                 except ValueError:
                     try:
-                        self.ktokens.append(float(word))
-                        self.ktokens.append(Token("REAL", word, self.stream.line, self.stream.pos - len(word)))
+                        num = float(word)
+                        self.tokens.append(Token("REAL", num, self.stream.line, self.stream.pos - len(word)))
                     except:
                         # syntax error illegal identifier name e.g. 1dx | 0long
                         pass
             else:
-                self.ktokens.append(Token("IDENTIFIER", word, self.stream.line, self.stream.pos - len(word)))
+                self.tokens.append(Token("IDENTIFIER", word, self.stream.line, self.stream.pos - len(word)))
 
     def __fetch_operator(self):
-        op = self.stream.pop()
+        # badly hardcoded
+        first_op = self.stream.pop()
+        ssecond_op = self.stream.pop()
+        if ssecond_op not in "->":
+            self.stream.push(ssecond_op)
+            ssecond_op = ""
+        first_op += ssecond_op           
 
-        if op in self._reserved_operator:
-            self.ktokens.append(Token("OPERATOR", op, self.stream.line, self.stream.pos - len(op)))
-        elif op in self._special:
-            self.ktokens.append(Token("BRACES", op, self.stream.line, self.stream.pos - len(op)))
+        if first_op in self._reserved_operator:
+            self.tokens.append(Token("OPERATOR", first_op, self.stream.line, self.stream.pos - len(first_op)))
+        elif first_op in self._special:
+            self.tokens.append(Token("BRACES", first_op, self.stream.line, self.stream.pos - len(first_op)))
         else:
             # syntax error illegal no operator or just ignore completely
             pass
@@ -102,16 +111,18 @@ class Tokenizer:
             comment += ch
             ch = self.stream.pop()
         comment += ch
-        self.ktokens.append(Token("COMMENT", comment, self.stream.line, self.stream.pos - len(comment)))
+        self.tokens.append(Token("COMMENT", comment, self.stream.line, self.stream.pos - len(comment)))
 
     def __tokenize(self):
         while True:
             c = self.stream.pop()
-            if c.isalpha():
+            if c.isalnum():
                 self.stream.push(c)
                 self.__fetch_word()
             elif c == ' ':
                 continue
+            elif c == '\n':
+                self.tokens.append(Token("NEWLINE", c, self.stream.line, self.stream.pos - 1))
             elif c == '{':
                 self.stream.push(c)
                 self.__fetch_comment()

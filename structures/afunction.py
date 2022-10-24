@@ -1,4 +1,4 @@
-from functionbase import FunctionBase
+from structures.functionbase import FunctionBase
 
 # TODO: Buat Function call
 

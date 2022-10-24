@@ -10,6 +10,9 @@ class Integer(PrimitiveDataTypes):
     def type(self):
         return "INTEGER"
 
+    def __str__(self) -> str:
+        return super().__str__()
+
     def __add__(self, other):
         if isinstance(other, (Integer, Real)):
             return Integer(self.value + int(other.value)) # type: ignore
@@ -60,6 +63,9 @@ class Real(PrimitiveDataTypes):
     @property
     def type(self):
         return "REAL"
+
+    def __str__(self) -> str:
+        return super().__str__()
 
     def __add__(self, other):
         if isinstance(other, (Integer, Real)):
